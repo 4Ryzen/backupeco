@@ -308,7 +308,7 @@ export default function SupportPage() {
                   <Mail className="size-5 text-green-600" />
                   <div>
                     <p className="font-medium text-gray-900">Email</p>
-                    <p className="text-gray-600">suporte@ecoair.com.br</p>
+                    <p className="text-gray-600">ecoair.com.br@gmail.com</p>
                   </div>
                 </div>
               </div>
