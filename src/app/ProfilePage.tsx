@@ -3,8 +3,7 @@ import { useAuth } from './AuthContext';
 import { Button } from './components/ui/button';
 import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Bell, X, Check, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { supabase } from '../lib/supabase';
 
 export default function ProfilePage() {
   const { user, updateUser, logout } = useAuth();
@@ -39,26 +38,22 @@ export default function ProfilePage() {
     setMessage('');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
+      const newEmail = profileData.email.trim().toLowerCase();
+      const emailChanged = newEmail !== (user?.email ?? '').toLowerCase();
+      const { error } = await supabase.auth.updateUser({
+        ...(emailChanged ? { email: newEmail } : {}),
+        data: { name: profileData.name.trim() },
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage('Perfil atualizado com sucesso!');
+      if (!error) {
+        setMessage(emailChanged
+          ? 'Perfil atualizado! Enviamos um link de confirmação para o novo email.'
+          : 'Perfil atualizado com sucesso!');
         setShowEditProfile(false);
-        // Update user in context
-        updateUser({ name: profileData.name, email: profileData.email });
-        setTimeout(() => setMessage(''), 3000);
+        updateUser({ name: profileData.name.trim() });
+        setTimeout(() => setMessage(''), 4000);
       } else {
-        setMessage(data.error || 'Erro ao atualizar perfil');
+        setMessage(error.message || 'Erro ao atualizar perfil');
       }
     } catch (error) {
       setMessage('Erro de conexão. Tente novamente.');
@@ -85,28 +80,25 @@ export default function ProfilePage() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
+      // Confere a senha atual antes de trocar
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user?.email ?? '',
+        password: passwordData.currentPassword
       });
+      if (authError) {
+        setMessage('Senha atual incorreta');
+        return;
+      }
 
-      const data = await response.json();
+      const { error } = await supabase.auth.updateUser({ password: passwordData.newPassword });
 
-      if (response.ok) {
+      if (!error) {
         setMessage('Senha alterada com sucesso!');
         setShowChangePassword(false);
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage(data.error || 'Erro ao alterar senha');
+        setMessage(error.message || 'Erro ao alterar senha');
       }
     } catch (error) {
       setMessage('Erro de conexão. Tente novamente.');
@@ -120,24 +112,16 @@ export default function ProfilePage() {
     setMessage('');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/auth/security-settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(securitySettings)
+      const { error } = await supabase.auth.updateUser({
+        data: { security_settings: securitySettings }
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (!error) {
         setMessage('Configurações de segurança atualizadas!');
         setShowSecuritySettings(false);
         setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage(data.error || 'Erro ao atualizar configurações');
+        setMessage(error.message || 'Erro ao atualizar configurações');
       }
     } catch (error) {
       setMessage('Erro de conexão. Tente novamente.');

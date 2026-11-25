@@ -1,3 +1,9 @@
 [build]
   command = "npm run build"
   publish = "dist"
+
+# SPA: sem isso, /dashboard, /perfil etc. dão 404 ao recarregar a página
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

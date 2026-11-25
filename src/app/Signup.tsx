@@ -13,11 +13,13 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const { signup, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfo('');
 
     if (!name || !email || !password || !confirmPassword) {
       setError('Por favor, preencha todos os campos.');
@@ -36,15 +38,19 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
 
     const result = await signup(name, email, password);
     if (result.success) {
-      onClose();
+      if (result.needsEmailConfirmation) {
+        setInfo('Conta criada! Enviamos um link de confirmação para o seu email. Clique nele e depois faça login.');
+      } else {
+        onClose();
+      }
     } else {
       setError(result.message || 'Este email já está cadastrado.');
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="relative bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <h2 className="text-2xl font-bold mb-6 text-center">Criar Conta</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -67,6 +73,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
             <input
               type="email"
               id="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -80,6 +87,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
             <input
               type="password"
               id="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -93,13 +101,15 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
             <input
               type="password"
               id="confirmPassword"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               required
             />
           </div>
-          {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+          {error && <p role="alert" className="text-red-500 text-sm mb-4">{error}</p>}
+          {info && <p role="status" className="text-green-700 text-sm mb-4">{info}</p>}
           <Button type="submit" className="w-full mb-4" disabled={isLoading}>
             {isLoading ? 'Criando conta...' : 'Criar Conta'}
           </Button>
@@ -107,6 +117,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
         <p className="text-center text-sm">
           Já tem conta?{' '}
           <button
+            type="button"
             onClick={onSwitchToLogin}
             className="text-green-600 hover:underline"
           >
@@ -114,7 +125,9 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onClose }) => {
           </button>
         </p>
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Fechar"
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
         >
           ✕
