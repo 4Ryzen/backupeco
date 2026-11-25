@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // IMPORTANTE: este nome precisa ser igual ao nome do Worker criado no painel da Cloudflare
+  "name": "backupeco",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // Faz /dashboard, /perfil etc. abrirem o index.html (React Router) em vez de dar 404
+    "not_found_handling": "single-page-application"
+  }
+}
