@@ -3,8 +3,7 @@ import { useAuth } from './AuthContext';
 import { Button } from './components/ui/button';
 import { ArrowLeft, BarChart3, AlertTriangle, Activity, TrendingUp, RefreshCw, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { supabase } from '../lib/supabase';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -31,39 +30,51 @@ export default function DashboardPage() {
   });
   const [alerts, setAlerts] = useState([]);
 
-  // Fetch dashboard data
-  const fetchDashboardData = async () => {
+  // Carrega alertas e contagem de relatórios do Supabase
+  const loadRemoteData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/dashboard`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const [alertsRes, reportsRes] = await Promise.all([
+        supabase.from('alerts').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
+        supabase.from('reports').select('id', { count: 'exact', head: true }),
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        setDashboardData(data.dashboard);
-        setAlerts(data.alerts);
-        setLastUpdate(new Date());
-      }
+      const activeAlerts = alertsRes.data ?? [];
+      setAlerts(activeAlerts as any);
+      setDashboardData((prev) => ({
+        ...prev,
+        alerts: activeAlerts.length,
+        reportsCount: reportsRes.count ?? 0,
+      }));
+      setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
   };
 
+  // Leituras dos sensores: ainda são simuladas no navegador (não há sensor real conectado)
+  const simulateReadings = () => {
+    setDashboardData((prev) => ({
+      ...prev,
+      currentEmissions: prev.currentEmissions + Math.floor(Math.random() * 21) - 10,
+      reductionToday: Math.max(-20, Math.min(5,
+        prev.reductionToday + (Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0)
+      )),
+    }));
+    setLastUpdate(new Date());
+  };
+
   useEffect(() => {
     if (user) {
-      fetchDashboardData();
-      // Set up polling for real-time updates
-      const interval = setInterval(fetchDashboardData, 5000);
+      loadRemoteData();
+      const interval = setInterval(simulateReadings, 5000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchDashboardData();
+    await loadRemoteData();
+    simulateReadings();
     setIsRefreshing(false);
   };
 
@@ -74,23 +85,17 @@ export default function DashboardPage() {
   const handleGenerateReport = async () => {
     setReportGenerating(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/reports/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          type: 'Personalizado',
-          period: 'Hoje',
-          title: `Relatório Personalizado - ${new Date().toLocaleDateString('pt-BR')}`
-        })
+      const { error } = await supabase.from('reports').insert({
+        type: 'Personalizado',
+        period: 'Hoje',
+        title: `Relatório Personalizado - ${new Date().toLocaleDateString('pt-BR')}`,
+        status: 'Completo',
       });
 
-      if (response.ok) {
+      if (!error) {
         setShowReportModal(false);
-        alert('Relatório está sendo gerado. Você será notificado quando estiver pronto.');
+        setDashboardData((prev) => ({ ...prev, reportsCount: prev.reportsCount + 1 }));
+        alert('Relatório gerado com sucesso! Veja na página de Relatórios.');
       } else {
         alert('Erro ao gerar relatório. Tente novamente.');
       }

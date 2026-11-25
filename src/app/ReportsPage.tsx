@@ -3,8 +3,7 @@ import { useAuth } from './AuthContext';
 import { Button } from './components/ui/button';
 import { ArrowLeft, FileText, Download, Calendar, Filter, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { supabase } from '../lib/supabase';
 
 export default function ReportsPage() {
   const { user } = useAuth();
@@ -32,19 +31,14 @@ export default function ReportsPage() {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/reports`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const { data, error: dbError } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        throw new Error('Erro ao carregar relatórios');
-      }
+      if (dbError) throw new Error('Erro ao carregar relatórios: ' + dbError.message);
 
-      const data = await response.json();
-      setReports(data.reports || []);
+      setReports((data ?? []).map((r) => ({ ...r, fileUrl: r.file_url })));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -55,27 +49,17 @@ export default function ReportsPage() {
   const handleGenerateReport = async () => {
     setGeneratingReport(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/reports/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          type: newReport.type,
-          period: newReport.period,
-          title: newReport.title || `Relatório ${newReport.type} - ${new Date().toLocaleDateString('pt-BR')}`
-        }),
+      const { error: dbError } = await supabase.from('reports').insert({
+        title: newReport.title || `Relatório ${newReport.type} - ${new Date().toLocaleDateString('pt-BR')}`,
+        type: newReport.type,
+        period: newReport.period,
+        status: 'Completo',
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao gerar relatório');
-      }
+      if (dbError) throw new Error(dbError.message);
 
-      const data = await response.json();
-      alert(data.message);
-      
+      alert('Relatório gerado com sucesso!');
+
       // Reset form
       setNewReport({
         type: 'Mensal',
@@ -86,7 +70,7 @@ export default function ReportsPage() {
       });
       
       // Refresh reports list
-      setTimeout(() => fetchReports(), 3000);
+      fetchReports();
     } catch (err) {
       alert('Erro ao gerar relatório: ' + (err instanceof Error ? err.message : 'Erro desconhecido'));
     } finally {
@@ -115,17 +99,9 @@ export default function ReportsPage() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/reports/${reportId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const { error: dbError } = await supabase.from('reports').delete().eq('id', reportId);
 
-      if (!response.ok) {
-        throw new Error('Erro ao excluir relatório');
-      }
+      if (dbError) throw new Error(dbError.message);
 
       alert('Relatório excluído com sucesso');
       fetchReports();
